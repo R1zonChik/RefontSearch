@@ -1,0 +1,55 @@
+name: RefontSearch
+version: "1.0.2"
+main: ru.lostone.refontsearch.RefontSearch
+api-version: "1.20"
+commands:
+  policecall:
+    description: "Вызов полиции: /policecall [сообщение]"
+    usage: "/policecall [сообщение]"
+  policeaccept:
+    description: "Принять вызов полиции: /policeaccept <ник>"
+    usage: "/policeaccept <ник>"
+    permission: "refontsearch.police"
+  wanted:
+    description: "Управление розыском и просмотр списка: /wanted [ник] [звезды] [причина]"
+    usage: "/wanted [ник] [звезды] [причина]"
+    permission: "refontsearch.police"
+  unwanted:
+    description: "Снять розыск с игрока: /unwanted <ник>"
+    usage: "/unwanted <ник>"
+    permission: "refontsearch.police"
+  policefind:
+    description: "Найти игрока в розыске по спутникам: /policefind <ник>"
+    usage: "/policefind <ник>"
+    permission: "refontsearch.police"
+  wanteditems:
+    description: "Выдать полицейский предмет: /wanteditems"
+    usage: "/wanteditems"
+    permission: "refontsearch.police"
+  setjail:
+    description: "Задать точку тюрьмы: /setjail <start|end> <x> <y> <z>"
+    usage: "/setjail <start|end> <x> <y> <z>"
+    permission: "refontsearch.admin"
+  unjail:
+    description: "Освободить игрока из тюрьмы: /unjail <ник>"
+    usage: "/unjail <ник>"
+    permission: "refontsearch.police"
+  arrest:
+    description: "Арестовать игрока: /arrest <ник> [force|время]"
+    usage: "/arrest <ник> [force|время]"
+    permission: "refontsearch.police"
+  arest:
+    description: "Принудительный арест от администратора: /arest <ник> [время]"
+    usage: "/arest <ник> [время]"
+    permission: "refontsearch.admin"
+  jails:
+    description: "Управление тюрьмами: /jails <create|remove|setpoint|list|setradius>"
+    usage: "/jails <create|remove|setpoint|list|setradius>"
+    permission: "refontsearch.admin"
+permissions:
+  refontsearch.police:
+    description: "Доступ для сотрудников полиции"
+    default: op
+  refontsearch.admin:
+    description: "Админские команды"
+    default: op
