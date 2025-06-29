@@ -97,6 +97,41 @@ demorgan:
     major: 180     # Серьезные нарушения (3 часа)
     severe: 720    # Тяжелые нарушения (12 часов)
 
+  # Эффекты для демогрант
+  effects:
+    # При входе в демогрант / переподключении
+    rejoin:
+      title: "§c§lДЕМОГРАН"
+      subtitle: "§7Вы находитесь в административной тюрьме"
+      fadeIn: 10
+      stay: 60
+      fadeOut: 20
+      sound: "block.iron_door.close"
+      soundVolume: 1.0
+      soundPitch: 1.0
+
+    # При попытке побега
+    escape:
+      title: "§c§lПОБЕГ НЕВОЗМОЖЕН!"
+      subtitle: "§7Охрана вернула вас в камеру"
+      fadeIn: 10
+      stay: 40
+      fadeOut: 20
+      sound: "entity.enderman.teleport"
+      soundVolume: 1.0
+      soundPitch: 0.5
+
+    # При освобождении
+    release:
+      title: "§a§lОСВОБОЖДЕНИЕ"
+      subtitle: "§7Вы были освобождены из демогрант"
+      fadeIn: 10
+      stay: 40
+      fadeOut: 20
+      sound: "entity.player.levelup"
+      soundVolume: 1.0
+      soundPitch: 1.0
+
 # ==================================================================================
 # ПЛЕЙСХОЛДЕРЫ ДЛЯ СТОРОННИХ ПЛАГИНОВ (PlaceholderAPI)
 # ==================================================================================

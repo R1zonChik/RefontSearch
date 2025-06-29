@@ -7,6 +7,7 @@ import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
+import ru.lostone.refontsearch.listener.DemorganMovementListener;
 import ru.lostone.refontsearch.command.*;
 import ru.lostone.refontsearch.listener.*;
 import ru.lostone.refontsearch.manager.DemorganManager;
@@ -567,6 +568,11 @@ public final class RefontSearch extends JavaPlugin {
      * Регистрирует слушатели событий
      */
     private void registerListeners() {
+
+        if (getConfig().getBoolean("demorgan.enabled", true)) {
+            Bukkit.getPluginManager().registerEvents(new DemorganMovementListener(this), this);
+        }
+
         Bukkit.getPluginManager().registerEvents(new PlayerDeathListener(), this);
         Bukkit.getPluginManager().registerEvents(new PlayerRespawnListener(this), this);
         Bukkit.getPluginManager().registerEvents(new WantedInventoryListener(), this);
