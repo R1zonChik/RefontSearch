@@ -27,8 +27,11 @@ public class PlayerJoinListener implements Listener {
             new BukkitRunnable() {
                 @Override
                 public void run() {
-                    if (plugin.getJailLocation() != null) {
-                        player.teleport(plugin.getJailLocation());
+                    // Проверяем валидность тюрьмы
+                    JailManager.checkJailValidity(player.getUniqueId());
+
+                    // Если после проверки игрок все еще в тюрьме
+                    if (JailManager.isJailed(player.getUniqueId())) {
                         player.setGameMode(GameMode.ADVENTURE);
                         JailManager.startJailTimer(player);
 

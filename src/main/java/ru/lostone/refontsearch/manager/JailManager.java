@@ -2,11 +2,13 @@ package ru.lostone.refontsearch.manager;
 
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
+import org.bukkit.Location;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 import ru.lostone.refontsearch.RefontSearch;
+import ru.lostone.refontsearch.model.Jail;
 
 import java.io.File;
 import java.io.IOException;
@@ -18,6 +20,9 @@ public class JailManager {
     private static File dataFile;
     private static FileConfiguration dataConfig;
     private static Map<UUID, BukkitRunnable> activeTimers = new HashMap<>();
+
+    // Карта для хранения времени окончания паузы показа таймера
+    private static Map<UUID, Long> pauseTimerDisplayUntil = new HashMap<>();
 
     public static void init(RefontSearch plugin) {
         dataFile = new File(plugin.getDataFolder(), "data.yml");
@@ -61,28 +66,110 @@ public class JailManager {
                 dataConfig.get("jailed." + uuid.toString()) != null;
     }
 
-    // Метод освобождения игрока. Теперь сразу отменяем таймер, удаляем запись из data.yml и не обновляем оставшееся время.
+    // Добавляем в JailManager.java метод автоматического освобождения
     public static void releasePlayer(UUID uuid) {
         if (activeTimers.containsKey(uuid)) {
             activeTimers.get(uuid).cancel();
             activeTimers.remove(uuid);
         }
+
         dataConfig.set("jailed." + uuid.toString(), null);
         saveData();
+
         Player player = Bukkit.getPlayer(uuid);
         if (player != null && player.isOnline()) {
             player.setGameMode(GameMode.SURVIVAL);
-            if (RefontSearch.getInstance().getUnjailLocation() != null) {
-                player.teleport(RefontSearch.getInstance().getUnjailLocation());
+
+            // Телепортируем в точку освобождения
+            Location releaseLocation = null;
+
+            // Сначала пробуем получить точку освобождения из конкретной тюрьмы
+            Jail playerJail = RefontSearch.getInstance().getJailsManager().getPlayerJail(uuid);
+            if (playerJail != null && playerJail.getReleaseLocation() != null) {
+                releaseLocation = playerJail.getReleaseLocation();
+            } else {
+                // Используем глобальную точку освобождения
+                releaseLocation = RefontSearch.getInstance().getUnjailLocation();
             }
+
+            // Если точки освобождения нет, телепортируем на спавн
+            if (releaseLocation == null) {
+                releaseLocation = player.getWorld().getSpawnLocation();
+            }
+
+            player.teleport(releaseLocation);
             player.sendTitle("§a§l⚔ Вы освобождены!", "", 10, 40, 10);
+
+            // Убираем информацию о тюрьме игрока
+            RefontSearch.getInstance().getJailsManager().removePlayerJail(uuid);
         }
+    }
+
+    // Добавьте этот метод в JailManager.java
+    public static long getRemainingTimeSeconds(UUID uuid) {
+        if (!isJailed(uuid)) {
+            return 0;
+        }
+
+        long endTime = dataConfig.getLong("jailed." + uuid.toString() + ".endTime");
+        long now = System.currentTimeMillis();
+
+        if (now >= endTime) {
+            return 0;
+        }
+
+        return (endTime - now) / 1000;
+    }
+
+    public static String getRemainingTime(UUID uuid) {
+        if (!isJailed(uuid)) {
+            return "0";
+        }
+
+        long endTime = dataConfig.getLong("jailed." + uuid.toString() + ".endTime");
+        long now = System.currentTimeMillis();
+
+        if (now >= endTime) {
+            return "0";
+        }
+
+        long secondsLeft = (endTime - now) / 1000;
+
+        if (secondsLeft < 3600) {
+            long minutes = secondsLeft / 60;
+            long seconds = secondsLeft % 60;
+            return String.format("%02d:%02d", minutes, seconds);
+        } else {
+            long hours = secondsLeft / 3600;
+            long minutes = (secondsLeft % 3600) / 60;
+            long seconds = secondsLeft % 60;
+            return String.format("%02d:%02d:%02d", hours, minutes, seconds);
+        }
+    }
+
+    // Метод для паузы показа таймера
+    public static void pauseTimerDisplay(UUID uuid, long milliseconds) {
+        pauseTimerDisplayUntil.put(uuid, System.currentTimeMillis() + milliseconds);
+    }
+
+    // Метод для проверки, можно ли показывать таймер
+    public static boolean canDisplayTimer(UUID uuid) {
+        Long pauseUntil = pauseTimerDisplayUntil.get(uuid);
+        if (pauseUntil == null) {
+            return true;
+        }
+        return System.currentTimeMillis() >= pauseUntil;
     }
 
     public static void startJailTimer(Player player) {
         UUID uuid = player.getUniqueId();
         if (dataConfig.get("jailed." + uuid.toString()) == null) return;
+
+        // Проверяем валидность тюрьмы при запуске таймера
+        checkJailValidity(uuid);
+
         long endTime = dataConfig.getLong("jailed." + uuid.toString() + ".endTime");
+
         BukkitRunnable timer = new BukkitRunnable() {
             @Override
             public void run() {
@@ -92,21 +179,27 @@ public class JailManager {
                     activeTimers.remove(uuid);
                     return;
                 }
+
                 if (!player.isOnline()) {
                     cancel();
                     activeTimers.remove(uuid);
                     return;
                 }
+
                 long now = System.currentTimeMillis();
                 if (now >= endTime) {
                     releasePlayer(uuid);
                     cancel();
                     return;
                 }
+
                 long secondsLeft = (endTime - now) / 1000;
+
                 // Обновляем запись "remaining" каждую секунду
                 dataConfig.set("jailed." + uuid.toString() + ".remaining", secondsLeft);
                 saveData();
+
+                // Показываем таймер в ActionBar вместо Title
                 String timeLeft;
                 if (secondsLeft < 3600) {
                     long minutes = secondsLeft / 60;
@@ -118,9 +211,13 @@ public class JailManager {
                     long seconds = secondsLeft % 60;
                     timeLeft = String.format("§c§l⌚ Тюремный срок §f%02d:%02d:%02d", hours, minutes, seconds);
                 }
-                player.sendTitle("", timeLeft, 0, 20, 0);
+
+                // Отправляем в ActionBar вместо Title
+                player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR,
+                        net.md_5.bungee.api.chat.TextComponent.fromLegacyText(timeLeft));
             }
         };
+
         timer.runTaskTimer(RefontSearch.getInstance(), 0L, 20L);
         activeTimers.put(uuid, timer);
     }
@@ -130,6 +227,40 @@ public class JailManager {
             dataConfig.save(dataFile);
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    public static void checkJailValidity(UUID playerId) {
+        if (isJailed(playerId)) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null && player.isOnline()) {
+                Location jailLoc = null;
+
+                // Проверяем, существует ли тюрьма игрока
+                Jail playerJail = RefontSearch.getInstance().getJailsManager().getPlayerJail(playerId);
+                if (playerJail != null && playerJail.getJailLocation() != null) {
+                    jailLoc = playerJail.getJailLocation();
+                } else {
+                    // Если нет конкретной тюрьмы, ищем любую другую
+                    jailLoc = RefontSearch.getInstance().getJailLocation();
+                    if (jailLoc == null) {
+                        Jail randomJail = RefontSearch.getInstance().getJailsManager().getRandomJail();
+                        if (randomJail != null && randomJail.getJailLocation() != null) {
+                            jailLoc = randomJail.getJailLocation();
+                            RefontSearch.getInstance().getJailsManager().setPlayerJail(playerId, randomJail.getName());
+                        } else {
+                            // Если нет никаких тюрем, освобождаем игрока
+                            releasePlayer(playerId);
+                            return;
+                        }
+                    }
+                }
+
+                // Если нашли тюрьму - телепортируем
+                if (jailLoc != null) {
+                    player.teleport(jailLoc);
+                }
+            }
         }
     }
 

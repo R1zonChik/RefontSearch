@@ -1,55 +1,116 @@
 name: RefontSearch
-version: "1.0.2"
+version: 1.0.4
 main: ru.lostone.refontsearch.RefontSearch
-api-version: "1.20"
+api-version: 1.20
+author: RizonChik
+description: Плагин для системы розыска и ареста игроков
+
 commands:
-  policecall:
-    description: "Вызов полиции: /policecall [сообщение]"
-    usage: "/policecall [сообщение]"
-  policeaccept:
-    description: "Принять вызов полиции: /policeaccept <ник>"
-    usage: "/policeaccept <ник>"
-    permission: "refontsearch.police"
-  wanted:
-    description: "Управление розыском и просмотр списка: /wanted [ник] [звезды] [причина]"
-    usage: "/wanted [ник] [звезды] [причина]"
-    permission: "refontsearch.police"
   unwanted:
-    description: "Снять розыск с игрока: /unwanted <ник>"
+    description: "Снять розыск с игрока"
     usage: "/unwanted <ник>"
-    permission: "refontsearch.police"
+    permission: refontsearch.unwanted
   policefind:
-    description: "Найти игрока в розыске по спутникам: /policefind <ник>"
+    description: "Найти игрока через спутники"
     usage: "/policefind <ник>"
-    permission: "refontsearch.police"
-  wanteditems:
-    description: "Выдать полицейский предмет: /wanteditems"
-    usage: "/wanteditems"
-    permission: "refontsearch.police"
-  setjail:
-    description: "Задать точку тюрьмы: /setjail <start|end> <x> <y> <z>"
-    usage: "/setjail <start|end> <x> <y> <z>"
-    permission: "refontsearch.admin"
-  unjail:
-    description: "Освободить игрока из тюрьмы: /unjail <ник>"
-    usage: "/unjail <ник>"
-    permission: "refontsearch.police"
+    permission: refontsearch.policefind
+  policecall:
+    description: "Вызвать полицию на помощь"
+    usage: "/policecall <сообщение>"
+  policeaccept:
+    description: "Принять вызов полиции"
+    usage: "/policeaccept <игрок>"
+    permission: refontsearch.policeaccept
+  wanted:
+    description: "Объявить игрока в розыск"
+    usage: "/wanted <ник> <звезды> <статья> <причина>"
+    permission: refontsearch.wanted
   arrest:
-    description: "Арестовать игрока: /arrest <ник> [force|время]"
-    usage: "/arrest <ник> [force|время]"
-    permission: "refontsearch.police"
-  arest:
-    description: "Принудительный арест от администратора: /arest <ник> [время]"
-    usage: "/arest <ник> [время]"
-    permission: "refontsearch.admin"
+    description: "Арестовать игрока в розыске"
+    usage: "/arrest <ник> [время] [статья] [тюрьма]"
+    permission: refontsearch.arrest
+  wanteditems:
+    description: "Получить полицейскую дубинку"
+    usage: "/wanteditems"
+    permission: refontsearch.wanteditems
+  setjail:
+    description: "Установить координаты тюрьмы"
+    usage: "/setjail [start|end]"
+    permission: refontsearch.setjail
+  unjail:
+    description: "Освободить игрока из тюрьмы"
+    usage: "/unjail <ник>"
+    permission: refontsearch.unjail
   jails:
-    description: "Управление тюрьмами: /jails <create|remove|setpoint|list|setradius>"
-    usage: "/jails <create|remove|setpoint|list|setradius>"
-    permission: "refontsearch.admin"
+    description: "Управление несколькими тюрьмами"
+    usage: "/jails <create|remove|list|setpoint|setradius> [аргументы]"
+    permission: refontsearch.jails
+  updatestars:
+    description: "Изменить количество звезд розыска"
+    usage: "/updatestars <ник> <новые_звезды>"
+    permission: refontsearch.updatestars
+
 permissions:
-  refontsearch.police:
-    description: "Доступ для сотрудников полиции"
-    default: op
   refontsearch.admin:
-    description: "Админские команды"
+    description: "Полные права администратора плагина"
     default: op
+    children:
+      - refontsearch.wanted
+      - refontsearch.unwanted
+      - refontsearch.arrest
+      - refontsearch.updatestars
+      - refontsearch.setjail
+      - refontsearch.unjail
+      - refontsearch.jails
+      - refontsearch.policefind
+      - refontsearch.policeaccept
+      - refontsearch.wanteditems
+
+  refontsearch.police:
+    description: "Права сотрудника полиции"
+    default: false
+    children:
+      - refontsearch.arrest
+      - refontsearch.policefind
+      - refontsearch.policeaccept
+      - refontsearch.wanteditems
+
+  refontsearch.wanted:
+    description: "Позволяет объявлять игроков в розыск"
+    default: op
+
+  refontsearch.unwanted:
+    description: "Позволяет снимать розыск с игроков"
+    default: op
+
+  refontsearch.arrest:
+    description: "Позволяет арестовывать игроков"
+    default: false
+
+  refontsearch.updatestars:
+    description: "Позволяет изменять количество звезд розыска"
+    default: op
+
+  refontsearch.setjail:
+    description: "Позволяет устанавливать координаты тюрьмы"
+    default: op
+
+  refontsearch.unjail:
+    description: "Позволяет освобождать игроков из тюрьмы"
+    default: op
+
+  refontsearch.jails:
+    description: "Позволяет управлять несколькими тюрьмами"
+    default: op
+
+  refontsearch.policefind:
+    description: "Позволяет искать игроков через спутники"
+    default: false
+
+  refontsearch.policeaccept:
+    description: "Позволяет принимать вызовы полиции"
+    default: false
+
+  refontsearch.wanteditems:
+    description: "Позволяет получать полицейское снаряжение"
+    default: false

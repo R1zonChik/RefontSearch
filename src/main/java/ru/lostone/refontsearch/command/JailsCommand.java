@@ -1,16 +1,19 @@
 package ru.lostone.refontsearch.command;
 
+import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import ru.lostone.refontsearch.RefontSearch;
+import ru.lostone.refontsearch.manager.JailManager;
 import ru.lostone.refontsearch.model.Jail;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public class JailsCommand implements CommandExecutor, TabCompleter {
 
@@ -86,6 +89,19 @@ public class JailsCommand implements CommandExecutor, TabCompleter {
                 boolean removed = plugin.getJailsManager().removeJail(jailName);
 
                 if (removed) {
+                    // Проверяем всех заключенных игроков и переназначаем им другие тюрьмы
+                    for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {
+                        UUID playerId = onlinePlayer.getUniqueId();
+                        if (JailManager.isJailed(playerId)) {
+                            Jail playerJail = plugin.getJailsManager().getPlayerJail(playerId);
+                            if (playerJail != null && playerJail.getName().equals(jailName)) {
+                                // Удаляем привязку к удаленной тюрьме
+                                plugin.getJailsManager().removePlayerJail(playerId);
+                                // Проверяем и переназначаем
+                                JailManager.checkJailValidity(playerId);
+                            }
+                        }
+                    }
                     player.sendMessage("§a§l⚔ §7Тюрьма '" + jailName + "' успешно удалена.");
                 } else {
                     player.sendMessage("§c§l⚔ §7Тюрьма с названием '" + jailName + "' не найдена.");

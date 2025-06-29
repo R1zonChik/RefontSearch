@@ -29,6 +29,69 @@ arrest:
   radius: 5.0        # Радиус в блоках для проведения ареста (полицейский должен быть близко к преступнику)
   broadcast: true    # Отправлять ли публичное сообщение о аресте
 
+# Настройки отображения
+display:
+  placeholder: "%player_name%"  # Плейсхолдер для отображения имени игрока (например: %mfio_nickname% для MFIO)
+  useRealNames: false          # Использовать реальные имена вместо ников майнкрафт
+
+# Настройки розыска
+wanted:
+  maxStars: 5  # Максимальное количество звезд розыска
+  allowCustomStars: true  # Разрешить менять количество звезд
+  requireArticle: true    # Требовать указание статьи УК при выдаче розыска
+
+# Настройки статей УК
+articles:
+  enabled: true
+  predefined:  # Предустановленные статьи для автодополнения
+    - "4.1 УК"
+    - "4.2 УК"
+    - "5.1 УК"
+    - "6.1 УК"
+    - "7.1 УК"
+    - "8.1 УК"
+    - "Административное нарушение"
+
+# ==================================================================================
+# ПЛЕЙСХОЛДЕРЫ ДЛЯ СТОРОННИХ ПЛАГИНОВ (PlaceholderAPI)
+# ==================================================================================
+#
+# Доступные плейсхолдеры:
+# %refontsearch_wanted% - true/false, находится ли игрок в розыске
+# %refontsearch_stars% - количество звезд розыска (число)
+# %refontsearch_stars_display% - звезды в виде символов (заполненные + пустые)
+# %refontsearch_stars_filled% - только заполненные звезды
+# %refontsearch_stars_empty% - только пустые звезды
+# %refontsearch_reason% - причина розыска
+# %refontsearch_article% - статья УК
+# %refontsearch_officer% - кто выдал розыск
+# %refontsearch_display_name% - отображаемое имя игрока (с учетом настроек)
+# %refontsearch_date% - дата выдачи розыска
+# %refontsearch_jailed% - true/false, находится ли игрок в тюрьме
+# %refontsearch_jail_time% - оставшееся время в тюрьме (формат ЧЧ:ММ:СС)
+# %refontsearch_jail_time_seconds% - оставшееся время в секундах
+# %refontsearch_status% - общий статус игрока (В розыске/В заключении/Чистый)
+#
+placeholders:
+  # Настройки отображения звезд
+  stars:
+    filled: "§6★"     # Символ заполненной звезды
+    empty: "§7★"      # Символ пустой звезды
+
+  # Значения по умолчанию для плейсхолдеров
+  default_values:
+    reason: "Нет"
+    article: "Не указана"
+    officer: "Неизвестно"
+    date: "Нет"
+    jail_time: "0"
+
+  # Статусы игрока
+  status:
+    wanted: "В розыске"
+    jailed: "В заключении"
+    clean: "Чистый"
+
 messages:
   policecall:
     sent: "§7Вы позвонили в полицию. Ваше сообщение: {message}"
@@ -38,29 +101,43 @@ messages:
     accepted: "§7Вы приняли вызов от игрока {caller}"
     notify: "§7Сотрудник полиции {police} принял ваш вызов."
   wanted:
-    set: "§7Розыск установлен для игрока {player} с уровнем {stars}"
+    set: "§7Розыск установлен для игрока {player} с уровнем {stars} по статье {article}"
     reason: "§7Причина: {reason}"
-    notify: "§7Игрок {player} объявлен в розыск по причине: §a{reason}"
+    notify: "§7Игрок {player} объявлен в розыск по статье {article}: §a{reason}"
+    updated: "§7Уровень розыска игрока {player} изменен на {stars}"
+    removed: "§7Розыск с игрока {player} снят"
     interface:
       title: "§0Розыск Страница {page}"
       player_name: "§9{player}"
       stars: "§9Уровень: {stars}"
+      article: "§9Статья: {article}"
       date: "§9В розыске с:"
       reason_label: "§9Причина:"
+      officer_label: "§9Выдал:"
       next_page: "§7Следующая страница →"
       prev_page: "§7← Предыдущая страница"
   arrested:
-    target: "§c§l⚔ §7Вы были арестованы на {time} секунд из-за {reason}!"
-    officer: "§a§l⚔ §7Вы {type} арестовали игрока {player} на {time} секунд."
-    broadcast: "§c§l⚔ §7Игрок {player} был {type} арестован офицером {officer}!"
+    target: "§c§l⚔ §7Вы были арестованы на {time} секунд по статье {article}!"
+    officer: "§a§l⚔ §7Вы {type}арестовали игрока {player} на {time} секунд по статье {article}."
+    broadcast: "§c§l⚔ §7Игрок {player} был {type}арестован офицером {officer} по статье {article}!"
   policefind: "§3По спутникам мы видели игрока {player} на координатах §a[{x}, {y}, {z}]§3. Следующий снимок через {time} секунд. Попробуйте позже."
   jail:
     rejoin: "§c§l⚔ §7Вы все еще находитесь в тюрьме!"
     leave: "§c§l⚔ §7Вы не можете покинуть тюрьму!"
+    released: "§a§l⚔ §7Вы освобождены из заключения!"
+  errors:
+    playerNotFound: "§cИгрок не найден или не в сети."
+    invalidStars: "§cНеверное количество звезд. Допустимо от 1 до {max}."
+    invalidTime: "§cНеверное время. Укажите время в секундах."
+    articleRequired: "§cУкажите статью УК для данного нарушения."
+    noPermission: "§cУ вас нет прав для использования этой команды."
+    alreadyWanted: "§cИгрок уже находится в розыске."
+    notWanted: "§cИгрок не находится в розыске."
 
 # Настройки для одной тюрьмы (для обратной совместимости)
 jail:
   radius: 30.0  # Радиус тюремной зоны в блоках
+  autoRelease: true  # Автоматически освобождать игроков по истечении срока
   location:
     start: ""   # Координаты точки тюрьмы (start) в формате "world;x;y;z"
     end: ""     # Координаты точки освобождения (end)
@@ -68,11 +145,20 @@ jail:
     title: "§a§lВы пробудились!"
     subtitle: "§7Вы попали в тюрьму..."
     fadeIn: 10
-    stay: 40
-    fadeOut: 10
+    stay: 60
+    fadeOut: 20
     sound: "block.anvil.land"
     soundVolume: 1.0
     soundPitch: 1.0
+  escape:
+    title: "§c§lВы пробудились!"
+    subtitle: "§7Охрана вернула вас в камеру..."
+    fadeIn: 10
+    stay: 40
+    fadeOut: 20
+    sound: "block.respawn_anchor.deplete"
+    soundVolume: 1.0
+    soundPitch: 0.5
 
 # Настройка нескольких тюрем
 jails:
@@ -95,3 +181,23 @@ jails:
 # Если baton.enabled = false, то механика полицейской дубинки (команда /wanteditems и обработчик) не регистрируется
 baton:
   enabled: true
+
+# Интеграция с PlaceholderAPI
+placeholderapi:
+  enabled: true
+  update_interval: 30  # Интервал обновления плейсхолдеров в секундах
+
+# Команды и права доступа
+commands:
+  wanted:
+    usage: "/wanted <ник> <звезды> <статья> <причина>"
+    permission: "refontsearch.wanted"
+  arrest:
+    usage: "/arrest <ник> [время] [статья] [тюрьма]"
+    permission: "refontsearch.arrest"
+  unwanted:
+    usage: "/unwanted <ник>"
+    permission: "refontsearch.unwanted"
+  updatestars:
+    usage: "/updatestars <ник> <новые_звезды>"
+    permission: "refontsearch.updatestars"

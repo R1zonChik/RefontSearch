@@ -1,80 +1,112 @@
 package ru.lostone.refontsearch.manager;
 
-import java.io.File;
-import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.*;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import ru.lostone.refontsearch.RefontSearch;
 import ru.lostone.refontsearch.WantedData;
 
+import java.io.File;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.*;
+
 public class WantedManager {
-    private static Map<UUID, WantedData> wantedMap = new HashMap<>();
     private static File dataFile;
     private static FileConfiguration dataConfig;
+    private static Map<UUID, Long> lastWantedTime = new HashMap<>();
 
     public static void init(RefontSearch plugin) {
-        dataFile = new File(plugin.getDataFolder(), "data.yml");
+        dataFile = new File(plugin.getDataFolder(), "wanted.yml");
         dataConfig = YamlConfiguration.loadConfiguration(dataFile);
-        loadData();
     }
 
-    public static void loadData() {
-        wantedMap.clear();
-        if (dataConfig.contains("wanted")) {
-            for (String uuidStr : dataConfig.getConfigurationSection("wanted").getKeys(false)) {
+    public static void setWanted(UUID uuid, int stars, String reason, String issuedBy) {
+        // Старый метод для обратной совместимости
+        WantedData data = new WantedData(stars, reason, issuedBy);
+        data.setPlayerName(uuid.toString());
+        data.setDisplayName(uuid.toString());
+        setWanted(uuid, data);
+    }
+
+    public static void setWanted(UUID uuid, WantedData data) {
+        // Новый метод
+        String path = "wanted." + uuid.toString();
+        dataConfig.set(path + ".stars", data.getStars());
+        dataConfig.set(path + ".reason", data.getReason());
+        dataConfig.set(path + ".article", data.getArticle());
+        dataConfig.set(path + ".officer", data.getOfficer());
+        dataConfig.set(path + ".playerName", data.getPlayerName());
+        dataConfig.set(path + ".displayName", data.getDisplayName());
+        dataConfig.set(path + ".timestamp", data.getTimestamp());
+        dataConfig.set(path + ".date", data.getDate());
+
+        lastWantedTime.put(uuid, System.currentTimeMillis());
+        saveData();
+    }
+
+    public static boolean isWanted(UUID uuid) {
+        return dataConfig.contains("wanted." + uuid.toString());
+    }
+
+    public static WantedData getWanted(UUID uuid) {
+        if (!isWanted(uuid)) return null;
+
+        String path = "wanted." + uuid.toString();
+        int stars = dataConfig.getInt(path + ".stars");
+        String reason = dataConfig.getString(path + ".reason");
+        String article = dataConfig.getString(path + ".article", "Не указана");
+        String officer = dataConfig.getString(path + ".officer");
+        String playerName = dataConfig.getString(path + ".playerName", uuid.toString());
+        String displayName = dataConfig.getString(path + ".displayName", playerName);
+        long timestamp = dataConfig.getLong(path + ".timestamp", System.currentTimeMillis());
+
+        WantedData data = new WantedData(playerName, displayName, stars, reason, article, officer);
+        data.setTimestamp(timestamp);
+
+        // Устанавливаем дату из конфига если есть
+        String savedDate = dataConfig.getString(path + ".date");
+        if (savedDate != null) {
+            data.setDate(savedDate);
+        }
+
+        return data;
+    }
+
+    public static void removeWanted(UUID uuid) {
+        dataConfig.set("wanted." + uuid.toString(), null);
+        lastWantedTime.remove(uuid);
+        saveData();
+    }
+
+    public static boolean canSetWanted(UUID issuer) {
+        if (!lastWantedTime.containsKey(issuer)) return true;
+
+        long cooldown = RefontSearch.getInstance().getConfig().getLong("wantedCooldown", 30) * 1000;
+        return System.currentTimeMillis() - lastWantedTime.get(issuer) >= cooldown;
+    }
+
+    public static Map<UUID, WantedData> getAllWanted() {
+        Map<UUID, WantedData> wantedPlayers = new HashMap<>();
+        if (!dataConfig.contains("wanted")) return wantedPlayers;
+
+        for (String uuidStr : dataConfig.getConfigurationSection("wanted").getKeys(false)) {
+            try {
                 UUID uuid = UUID.fromString(uuidStr);
-                String path = "wanted." + uuidStr;
-                int stars = dataConfig.getInt(path + ".stars");
-                String reason = dataConfig.getString(path + ".reason");
-                String date = dataConfig.getString(path + ".date");
-                String issuer = dataConfig.getString(path + ".issuer");
-                WantedData data = new WantedData(stars, reason, issuer);
-                data.setDate(date);
-                wantedMap.put(uuid, data);
-            }
+                WantedData data = getWanted(uuid);
+                if (data != null) {
+                    wantedPlayers.put(uuid, data);
+                }
+            } catch (IllegalArgumentException ignored) {}
         }
+
+        return wantedPlayers;
     }
 
-    public static void saveData() {
-        dataConfig.set("wanted", null);
-        for (Map.Entry<UUID, WantedData> entry : wantedMap.entrySet()) {
-            String path = "wanted." + entry.getKey().toString();
-            WantedData data = entry.getValue();
-            dataConfig.set(path + ".stars", data.getStars());
-            dataConfig.set(path + ".reason", data.getReason());
-            dataConfig.set(path + ".date", data.getDate());
-            dataConfig.set(path + ".issuer", data.getIssuedBy());
-        }
+    private static void saveData() {
         try {
             dataConfig.save(dataFile);
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
-
-    public static void addWanted(UUID target, WantedData data) {
-        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
-        data.setDate(sdf.format(new Date()));
-        wantedMap.put(target, data);
-        saveData();
-    }
-
-    public static WantedData getWanted(UUID target) {
-        return wantedMap.get(target);
-    }
-
-    public static boolean isWanted(UUID target) {
-        return wantedMap.containsKey(target);
-    }
-
-    public static void removeWanted(UUID target) {
-        wantedMap.remove(target);
-        saveData();
-    }
-
-    public static Map<UUID, WantedData> getAllWanted() {
-        return wantedMap;
     }
 }

@@ -23,93 +23,109 @@ public class WantedCommand implements CommandExecutor, TabCompleter {
     // Кулдаун на выдачу розыска (в миллисекундах)
     private static Map<UUID, Long> wantedCooldowns = new HashMap<>();
 
+    // WantedCommand.java - обновленная версия
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        // Если без аргументов, открыть GUI
         if (!(sender instanceof Player)) {
-            sender.sendMessage("Команда доступна только игрокам.");
+            sender.sendMessage("§cКоманда доступна только игрокам.");
             return true;
         }
+
         Player player = (Player) sender;
-
-        if (args.length == 0) {
-            openWantedList(player, 1);
+        if (!player.hasPermission("refontsearch.wanted")) {
+            player.sendMessage("§cУ вас нет прав для использования этой команды.");
             return true;
         }
 
-        // Если выдаем розыск, проверяем кулдаун
-        long current = System.currentTimeMillis();
-        UUID senderId = player.getUniqueId();
-        int cooldownSeconds = RefontSearch.getInstance().getConfig().getInt("wantedCooldown", 30);
-        long cooldownMillis = cooldownSeconds * 1000L;
-        if (wantedCooldowns.containsKey(senderId)) {
-            long last = wantedCooldowns.get(senderId);
-            if (current - last < cooldownMillis) {
-                long wait = (cooldownMillis - (current - last)) / 1000;
-                player.sendMessage("§cПодождите ещё " + wait + " секунд перед выдачей нового розыска.");
-                return true;
-            }
-        }
-        wantedCooldowns.put(senderId, current);
-
-        // Если выдаются аргументы, то выдаем розыск
-        if (args.length < 3) {
-            player.sendMessage("Использование: /wanted <ник> <звезды> [причина]");
+        if (args.length < 4) {
+            player.sendMessage("§cИспользование: /wanted <ник> <звезды> <статья> <причина>");
             return true;
         }
+
         String targetName = args[0];
         Player target = Bukkit.getPlayerExact(targetName);
+
         if (target == null) {
-            player.sendMessage("§cИгрок " + targetName + " не найден или не в сети.");
+            player.sendMessage("§cИгрок не найден.");
             return true;
         }
+
+        // Проверяем звезды
         int stars;
         try {
             stars = Integer.parseInt(args[1]);
+            int maxStars = RefontSearch.getInstance().getConfig().getInt("wanted.maxStars", 5);
+            if (stars < 1 || stars > maxStars) {
+                player.sendMessage("§cЗвезды должны быть от 1 до " + maxStars);
+                return true;
+            }
         } catch (NumberFormatException e) {
-            player.sendMessage("§cНеверное количество звёзд.");
+            player.sendMessage("§cНеверное количество звезд.");
             return true;
         }
-        if (stars < 1 || stars > 7) {
-            player.sendMessage("§cКоличество звёзд должно быть от 1 до 7.");
-            return true;
-        }
+
+        String article = args[2];
+
+        // Собираем причину из оставшихся аргументов
         StringBuilder reasonBuilder = new StringBuilder();
-        for (int i = 2; i < args.length; i++) {
-            reasonBuilder.append(args[i]).append(" ");
+        for (int i = 3; i < args.length; i++) {
+            reasonBuilder.append(args[i]);
+            if (i < args.length - 1) {
+                reasonBuilder.append(" ");
+            }
         }
-        String reason = reasonBuilder.toString().trim();
-        WantedData data = new WantedData(stars, reason, player.getName());
-        WantedManager.addWanted(target.getUniqueId(), data);
+        String reason = reasonBuilder.toString();
 
-        String setTemplate = RefontSearch.getInstance().getConfig()
-                .getString("messages.wanted.set", "Розыск установлен для {player} с уровнем {stars}");
-        String setMessage = setTemplate.replace("{player}", target.getName())
-                .replace("{stars}", String.valueOf(stars));
-        player.sendMessage(setMessage);
+        // Получаем отображаемое имя
+        String displayName = getDisplayName(target);
 
-        String reasonTemplate = RefontSearch.getInstance().getConfig()
-                .getString("messages.wanted.reason", "Причина: {reason}");
-        List<String> wrappedReason = wrapText(reason, MAX_REASON_LINE_LENGTH);
-        StringBuilder finalReason = new StringBuilder();
-        for (String line : wrappedReason) {
-            finalReason.append("§f").append(line).append("\n");
-        }
-        String reasonMessage = reasonTemplate.replace("{reason}", finalReason.toString().trim());
-        player.sendMessage(reasonMessage);
+        // Создаем данные розыска
+        WantedData wantedData = new WantedData(target.getName(), displayName, stars, reason, article, player.getName());
+        WantedManager.setWanted(target.getUniqueId(), wantedData);
 
-        // Оповещаем полицейских об объявлении розыска
-        String notifyTemplate = RefontSearch.getInstance().getConfig()
-                .getString("messages.wanted.notify", "§3Игрок {player} объявлен в розыск по причине: {reason}");
-        String notifyMsg = notifyTemplate.replace("{player}", target.getName())
+        // Уведомления
+        String message = RefontSearch.getInstance().getConfig()
+                .getString("messages.wanted.set", "§7Розыск установлен для игрока {player} с уровнем {stars}")
+                .replace("{player}", displayName)
+                .replace("{stars}", String.valueOf(stars))
+                .replace("{article}", article);  // ДОБАВЬТЕ ЭТУ СТРОКУ
+        player.sendMessage(message);
+
+        String reasonMsg = RefontSearch.getInstance().getConfig()
+                .getString("messages.wanted.reason", "§7Причина: {reason}")
                 .replace("{reason}", reason);
-        for (Player p : Bukkit.getOnlinePlayers()) {
-            if (p.hasPermission("refontsearch.police")) {
-                p.sendMessage(notifyMsg);
+        player.sendMessage(reasonMsg);
+
+        String broadcastMsg = RefontSearch.getInstance().getConfig()
+                .getString("messages.wanted.notify", "§7Игрок {player} объявлен в розыск по статье {article}: §a{reason}")
+                .replace("{player}", displayName)
+                .replace("{article}", article)
+                .replace("{reason}", reason)
+                .replace("{stars}", String.valueOf(stars));
+
+        Bukkit.broadcastMessage(broadcastMsg);
+
+        return true;
+    }
+
+    private String getDisplayName(Player player) {
+        String placeholder = RefontSearch.getInstance().getConfig().getString("display.placeholder", "%player_name%");
+
+        if (placeholder.equals("%player_name%")) {
+            return player.getName();
+        }
+
+        // Если доступен PlaceholderAPI, используем его
+        if (Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
+            try {
+                return me.clip.placeholderapi.PlaceholderAPI.setPlaceholders(player, placeholder);
+            } catch (Exception e) {
+                // Если PlaceholderAPI недоступен, возвращаем ник
+                return player.getName();
             }
         }
 
-        return true;
+        return player.getName();
     }
 
     public void openWantedList(Player player, int page) {
@@ -215,11 +231,12 @@ public class WantedCommand implements CommandExecutor, TabCompleter {
                 }
             }
         } else if (args.length == 2) {
+            // Предлагаем количество звезд
             String partial = args[1];
-            for (int i = 1; i <= 7; i++) {
-                String num = String.valueOf(i);
-                if (num.startsWith(partial)) {
-                    completions.add(num);
+            int maxStars = RefontSearch.getInstance().getConfig().getInt("wanted.maxStars", 5); // БЕРЕМ ИЗ КОНФИГА
+            for (int i = 1; i <= maxStars; i++) {
+                if (String.valueOf(i).startsWith(partial)) {
+                    completions.add(String.valueOf(i));
                 }
             }
         }

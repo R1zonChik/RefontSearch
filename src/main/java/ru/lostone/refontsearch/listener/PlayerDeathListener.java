@@ -12,53 +12,51 @@ import ru.lostone.refontsearch.RefontSearch;
 import ru.lostone.refontsearch.WantedData;
 import ru.lostone.refontsearch.manager.WantedManager;
 import ru.lostone.refontsearch.manager.JailManager;
+import ru.lostone.refontsearch.model.Jail;
 
 public class PlayerDeathListener implements Listener {
 
+    // Добавить в класс PlayerDeathListener.java:
     @EventHandler
     public void onPlayerDeath(PlayerDeathEvent event) {
-        // Проверяем, активен ли арест при убийстве в конфиге
-        if (!RefontSearch.getInstance().getConfig().getBoolean("arrest.onKill", true)) {
-            return; // Если отключен - выходим из метода
-        }
+        Player killed = event.getEntity();
+        Player killer = killed.getKiller();
 
-        Player victim = event.getEntity();
-        Player killer = victim.getKiller();
+        // Проверяем, находится ли убитый в розыске
+        if (WantedManager.isWanted(killed.getUniqueId())) {
+            // Проверяем, является ли убийца полицейским
+            if (killer != null && killer.hasPermission("refontsearch.police")) {
+                // Определям время ареста по звездам розыска
+                WantedData data = WantedManager.getWanted(killed.getUniqueId());
+                int stars = data.getStars();
+                int jailTimeSeconds = RefontSearch.getInstance().getConfig().getInt("jailTimers." + stars, 900);
 
-        // Если убийца отсутствует или не имеет право (permission "refontsearch.police") – не тюремить
-        if (killer == null || !killer.hasPermission("refontsearch.police"))
-            return;
+                // Вычисляем время окончания ареста
+                long jailEndTime = System.currentTimeMillis() + (jailTimeSeconds * 1000L);
 
-        // Если жертва не числится в розыске – ничего не делаем
-        if (!WantedManager.isWanted(victim.getUniqueId()))
-            return;
+                // Сажаем в тюрьму
+                JailManager.jailPlayer(killed.getUniqueId(), jailEndTime);
 
-        // Теперь не важно, чем убили — убираем проверку предмета
-        WantedData data = WantedManager.getWanted(victim.getUniqueId());
-        int stars = data.getStars();
-
-        int jailTimeSeconds = RefontSearch.getInstance().getConfig().getInt("jailTimers." + stars, 900);
-        long jailTimeTicks = jailTimeSeconds * 20L;
-        long jailEndTime = System.currentTimeMillis() + (jailTimeSeconds * 1000L);
-
-        // Сохраняем данные о заключении (если игрок уже числится – новый срок перезаписывается)
-        JailManager.jailPlayer(victim.getUniqueId(), jailEndTime);
-
-        WantedManager.removeWanted(victim.getUniqueId());
-
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                if (RefontSearch.getInstance().getJailLocation() != null) {
-                    victim.teleport(RefontSearch.getInstance().getJailLocation());
-                    victim.setGameMode(GameMode.ADVENTURE);
-                    victim.sendMessage("§c§l⚔ §7Вы были посажены в тюрьму на " + jailTimeSeconds + " секунд(ы) за розыск!");
-                } else {
-                    victim.sendMessage("§c§l⚔ §7Точка тюрьмы не установлена!");
+                // Выбираем тюрьму
+                Jail jail = RefontSearch.getInstance().getJailsManager().getRandomJail();
+                if (jail != null && jail.getJailLocation() != null) {
+                    RefontSearch.getInstance().getJailsManager().setPlayerJail(killed.getUniqueId(), jail.getName());
                 }
-            }
-        }.runTaskLater(RefontSearch.getInstance(), 20L);
 
-        // Больше не выводим broadcast сообщение.
+                // Снимаем розыск
+                WantedManager.removeWanted(killed.getUniqueId());
+
+                // Сообщение для полицейского
+                killer.sendMessage("§a§l⚔ §7Вы арестовали игрока " + killed.getName() + " на " + jailTimeSeconds + " секунд.");
+
+                // Сообщение для арестованного (отправится после респавна)
+                new BukkitRunnable() {
+                    @Override
+                    public void run() {
+                        killed.sendMessage("§c§l⚔ §7Вы были арестованы на " + jailTimeSeconds + " секунд из-за розыска!");
+                    }
+                }.runTaskLater(RefontSearch.getInstance(), 40L);
+            }
+        }
     }
 }
