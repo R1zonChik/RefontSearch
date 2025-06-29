@@ -9,6 +9,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 import ru.lostone.refontsearch.command.*;
 import ru.lostone.refontsearch.listener.*;
+import ru.lostone.refontsearch.manager.DemorganManager;
 import ru.lostone.refontsearch.manager.JailManager;
 import ru.lostone.refontsearch.manager.WantedManager;
 import ru.lostone.refontsearch.manager.JailsManager;
@@ -436,6 +437,9 @@ public final class RefontSearch extends JavaPlugin {
     private void continueLoading() {
         isValidated = true;
 
+        DemorganManager.init(this);
+        DemorganManager.loadDemorganData();
+
         // Создаем/загружаем конфиг
         saveDefaultConfig();
 
@@ -541,6 +545,15 @@ public final class RefontSearch extends JavaPlugin {
             Bukkit.getPluginManager().registerEvents(new BatonMechanicListener(this), this);
         }
 
+        if (getConfig().getBoolean("demorgan.enabled", true)) {
+            getCommand("demorgan").setExecutor(new DemorganCommand(this));
+            getCommand("demorgan").setTabCompleter(new DemorganCommand(this));
+            getCommand("undemorgan").setExecutor(new UndemorganCommand(this));
+            getCommand("undemorgan").setTabCompleter(new UndemorganCommand(this));
+            getCommand("demorganlist").setExecutor(new DemorganListCommand(this));
+            getCommand("setdemorgan").setExecutor(new SetDemorganCommand(this));
+        }
+
         getCommand("setjail").setExecutor(new SetJailCommand());
         getCommand("unjail").setExecutor(new UnjailCommand());
         getCommand("unjail").setTabCompleter(new UnjailCommand());
@@ -630,6 +643,7 @@ public final class RefontSearch extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        DemorganManager.onDisable();
         if (isValidated) {
             JailManager.onDisable();
             getLogger().info("╔══════════════════════════════════════╗");

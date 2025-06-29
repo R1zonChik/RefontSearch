@@ -1,9 +1,9 @@
 name: RefontSearch
-version: 1.0.4
+version: 1.0.5
 main: ru.lostone.refontsearch.RefontSearch
-api-version: 1.20
+api-version: 1.16
 author: RizonChik
-description: Плагин для системы розыска и ареста игроков
+description: Плагин для системы розыска, ареста игроков и демогрант
 
 commands:
   unwanted:
@@ -49,6 +49,22 @@ commands:
     description: "Изменить количество звезд розыска"
     usage: "/updatestars <ник> <новые_звезды>"
     permission: refontsearch.updatestars
+  demorgan:
+    description: "Отправить игрока в деморган"
+    usage: "/demorgan <ник> <время_в_минутах> <причина>"
+    permission: refontsearch.demorgan
+  undemorgan:
+    description: "Освободить игрока из демогрант"
+    usage: "/undemorgan <ник>"
+    permission: refontsearch.undemorgan
+  demorganlist:
+    description: "Список игроков в демогрант"
+    usage: "/demorganlist"
+    permission: refontsearch.demorgan.view
+  setdemorgan:
+    description: "Установить координаты демогрант"
+    usage: "/setdemorgan [spawn|release]"
+    permission: refontsearch.setdemorgan
 
 permissions:
   refontsearch.admin:
@@ -65,6 +81,11 @@ permissions:
       - refontsearch.policefind
       - refontsearch.policeaccept
       - refontsearch.wanteditems
+      - refontsearch.demorgan
+      - refontsearch.undemorgan
+      - refontsearch.demorgan.view
+      - refontsearch.demorgan.bypass
+      - refontsearch.setdemorgan
 
   refontsearch.police:
     description: "Права сотрудника полиции"
@@ -74,6 +95,14 @@ permissions:
       - refontsearch.policefind
       - refontsearch.policeaccept
       - refontsearch.wanteditems
+
+  refontsearch.moderator:
+    description: "Права модератора (демогрант)"
+    default: false
+    children:
+      - refontsearch.demorgan
+      - refontsearch.undemorgan
+      - refontsearch.demorgan.view
 
   refontsearch.wanted:
     description: "Позволяет объявлять игроков в розыск"
@@ -114,3 +143,23 @@ permissions:
   refontsearch.wanteditems:
     description: "Позволяет получать полицейское снаряжение"
     default: false
+
+  refontsearch.demorgan:
+    description: "Позволяет отправлять игроков в деморган"
+    default: op
+
+  refontsearch.undemorgan:
+    description: "Позволяет освобождать игроков из демогрант"
+    default: op
+
+  refontsearch.demorgan.view:
+    description: "Позволяет просматривать список игроков в демогрант"
+    default: op
+
+  refontsearch.demorgan.bypass:
+    description: "Позволяет обходить ограничения демогрант"
+    default: op
+
+  refontsearch.setdemorgan:
+    description: "Позволяет устанавливать координаты демогрант"
+    default: op
