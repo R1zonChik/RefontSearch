@@ -327,12 +327,14 @@ public class IPProtection {
                 return false;
             }
 
-            // Проверяем версию (можете изменить на актуальную)
-            String expectedVersion = "1.0.4"; // Измените на вашу версию
-            if (!expectedVersion.equals(pluginVersion)) {
-                plugin.getLogger().warning("❌ Неверная версия плагина: " + pluginVersion + " (ожидается: " + expectedVersion + ")");
+            // Проверяем, что версия существует и не пустая
+            if (pluginVersion == null || pluginVersion.trim().isEmpty()) {
+                plugin.getLogger().warning("❌ Версия плагина не найдена в plugin.yml");
                 return false;
             }
+
+            // Логируем успешную проверку
+            plugin.getLogger().info("✅ Проверка целостности пройдена: " + pluginName + " v" + pluginVersion);
 
             return true;
 

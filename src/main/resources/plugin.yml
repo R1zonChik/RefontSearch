@@ -1,9 +1,10 @@
 name: RefontSearch
-version: 1.0.5
+version: 1.0.6
 main: ru.lostone.refontsearch.RefontSearch
 api-version: 1.16
 author: RizonChik
 description: Плагин для системы розыска, ареста игроков и демогрант
+softdepend: [PlaceholderAPI]
 
 commands:
   unwanted:
@@ -22,9 +23,10 @@ commands:
     usage: "/policeaccept <игрок>"
     permission: refontsearch.policeaccept
   wanted:
-    description: "Объявить игрока в розыск"
-    usage: "/wanted <ник> <звезды> <статья> <причина>"
+    description: "Объявить игрока в розыск или открыть список"
+    usage: "/wanted [<ник> <звезды> <статья> <причина>]"
     permission: refontsearch.wanted
+    aliases: [wanteds, wantedlist]
   arrest:
     description: "Арестовать игрока в розыске"
     usage: "/arrest <ник> [время] [статья] [тюрьма]"
@@ -114,7 +116,7 @@ permissions:
 
   refontsearch.arrest:
     description: "Позволяет арестовывать игроков"
-    default: false
+    default: op
 
   refontsearch.updatestars:
     description: "Позволяет изменять количество звезд розыска"
@@ -134,15 +136,15 @@ permissions:
 
   refontsearch.policefind:
     description: "Позволяет искать игроков через спутники"
-    default: false
+    default: op
 
   refontsearch.policeaccept:
     description: "Позволяет принимать вызовы полиции"
-    default: false
+    default: op
 
   refontsearch.wanteditems:
     description: "Позволяет получать полицейское снаряжение"
-    default: false
+    default: op
 
   refontsearch.demorgan:
     description: "Позволяет отправлять игроков в деморган"

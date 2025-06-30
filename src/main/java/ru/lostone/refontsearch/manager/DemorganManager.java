@@ -5,6 +5,7 @@ import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import ru.lostone.refontsearch.DemorganData;
 import ru.lostone.refontsearch.RefontSearch;
@@ -18,13 +19,20 @@ public class DemorganManager {
     private static final Map<String, DemorganData> demorganPlayers = new ConcurrentHashMap<>();
     private static final Map<String, BukkitTask> releaseTasks = new ConcurrentHashMap<>();
 
+    // ========== НОВЫЙ ФУНКЦИОНАЛ: ТАЙМЕРЫ ==========
+    private static final Map<UUID, BukkitTask> timerTasks = new ConcurrentHashMap<>();
+    // ================================================
+
     public static void init(RefontSearch instance) {
         plugin = instance;
 
         // Запускаем периодическую проверку каждые 30 секунд
         Bukkit.getScheduler().runTaskTimer(plugin, DemorganManager::checkExpiredPunishments, 600L, 600L);
 
-        plugin.getLogger().info("DemorganManager инициализирован");
+        // ПРИНУДИТЕЛЬНАЯ проверка местоположения каждые 5 секунд
+        Bukkit.getScheduler().runTaskTimer(plugin, DemorganManager::checkPlayerLocations, 100L, 100L);
+
+        plugin.getLogger().info("DemorganManager инициализирован с принудительной проверкой местоположения и таймерами");
     }
 
     /**
@@ -64,10 +72,87 @@ public class DemorganManager {
         // Планируем автоматическое освобождение
         scheduleRelease(playerName, durationSeconds);
 
+        // ========== НОВЫЙ ФУНКЦИОНАЛ: ЗАПУСК ТАЙМЕРА ==========
+        startDemorganTimer(player, durationSeconds);
+        // =====================================================
+
         // Сохраняем данные
         saveDemorganData();
 
         plugin.getLogger().info("Игрок " + playerName + " отправлен в деморган на " + durationSeconds + " секунд по причине: " + reason + " (Администратор: " + administrator + ")");
+    }
+
+    /**
+     * ========== НОВЫЙ МЕТОД: ЗАПУСК ТАЙМЕРА ДЕМОГРАНТ ==========
+     */
+    private static void startDemorganTimer(Player player, long durationSeconds) {
+        UUID playerUUID = player.getUniqueId();
+
+        // Останавливаем предыдущий таймер, если есть
+        if (timerTasks.containsKey(playerUUID)) {
+            timerTasks.get(playerUUID).cancel();
+            timerTasks.remove(playerUUID);
+        }
+
+        // Создаем новый таймер
+        BukkitTask timerTask = new BukkitRunnable() {
+            @Override
+            public void run() {
+                DemorganData data = demorganPlayers.get(player.getName());
+                if (data == null || System.currentTimeMillis() >= data.getReleaseTime()) {
+                    // Время истекло или игрок освобожден
+                    this.cancel();
+                    timerTasks.remove(playerUUID);
+                    return;
+                }
+
+                // Если игрок не онлайн, останавливаем таймер
+                if (!player.isOnline()) {
+                    this.cancel();
+                    timerTasks.remove(playerUUID);
+                    return;
+                }
+
+                long remainingSeconds = (data.getReleaseTime() - System.currentTimeMillis()) / 1000;
+                if (remainingSeconds <= 0) {
+                    this.cancel();
+                    timerTasks.remove(playerUUID);
+                    return;
+                }
+
+                String formattedTime = formatTime(remainingSeconds);
+                String title = ChatColor.translateAlternateColorCodes('&',
+                        plugin.getConfig().getString("demorgan.effects.timer.title", "§c§lДЕМОГРАН"));
+                String subtitle = ChatColor.translateAlternateColorCodes('&',
+                                plugin.getConfig().getString("demorgan.effects.timer.subtitle", "§7Осталось: §e{time}"))
+                        .replace("{time}", formattedTime);
+
+                int fadeIn = plugin.getConfig().getInt("demorgan.effects.timer.fadeIn", 0);
+                int stay = plugin.getConfig().getInt("demorgan.effects.timer.stay", 25);
+                int fadeOut = plugin.getConfig().getInt("demorgan.effects.timer.fadeOut", 10);
+
+                player.sendTitle(title, subtitle, fadeIn, stay, fadeOut);
+            }
+        }.runTaskTimer(plugin, 0L, 20L); // Запускаем сразу, повторяем каждую секунду
+
+        timerTasks.put(playerUUID, timerTask);
+    }
+
+    /**
+     * ========== НОВЫЙ МЕТОД: ФОРМАТИРОВАНИЕ ВРЕМЕНИ ==========
+     */
+    private static String formatTime(long seconds) {
+        long hours = seconds / 3600;
+        long minutes = (seconds % 3600) / 60;
+        long secs = seconds % 60;
+
+        if (hours > 0) {
+            return String.format("%d ч %d мин %d сек", hours, minutes, secs);
+        } else if (minutes > 0) {
+            return String.format("%d мин %d сек", minutes, secs);
+        } else {
+            return String.format("%d сек", secs);
+        }
     }
 
     /**
@@ -83,8 +168,18 @@ public class DemorganManager {
             task.cancel();
         }
 
-        // Телепортируем игрока обратно
+        // ========== НОВЫЙ ФУНКЦИОНАЛ: ОСТАНОВКА ТАЙМЕРА ==========
         Player player = Bukkit.getPlayer(playerName);
+        if (player != null) {
+            UUID playerUUID = player.getUniqueId();
+            if (timerTasks.containsKey(playerUUID)) {
+                timerTasks.get(playerUUID).cancel();
+                timerTasks.remove(playerUUID);
+            }
+        }
+        // =========================================================
+
+        // Телепортируем игрока обратно
         if (player != null && player.isOnline()) {
             Location releaseLocation = getReleaseLocation();
             if (releaseLocation != null) {
@@ -99,6 +194,45 @@ public class DemorganManager {
         saveDemorganData();
 
         plugin.getLogger().info("Игрок " + playerName + " освобожден из демогрант");
+    }
+
+    /**
+     * ========== НОВЫЙ МЕТОД: ОБРАБОТКА ВЫХОДА ИГРОКА ==========
+     */
+    public static void onPlayerQuit(Player player) {
+        UUID playerUUID = player.getUniqueId();
+        if (timerTasks.containsKey(playerUUID)) {
+            timerTasks.get(playerUUID).cancel();
+            timerTasks.remove(playerUUID);
+        }
+    }
+
+    /**
+     * ========== НОВЫЙ МЕТОД: ВОССТАНОВЛЕНИЕ ТАЙМЕРА ПРИ ВХОДЕ ==========
+     */
+    public static void onPlayerJoin(Player player) {
+        String playerName = player.getName();
+        if (isInDemorgan(playerName)) {
+            DemorganData data = getDemorganData(playerName);
+            if (data != null) {
+                long remainingSeconds = (data.getReleaseTime() - System.currentTimeMillis()) / 1000;
+                if (remainingSeconds > 0) {
+                    // Показываем эффекты возвращения в демогрант
+                    showDemorganEffects(player);
+                    // Запускаем таймер
+                    startDemorganTimer(player, remainingSeconds);
+
+                    // Телепортируем в демогрант
+                    Location demorganLocation = getDemorganLocation();
+                    if (demorganLocation != null) {
+                        player.teleport(demorganLocation);
+                    }
+                } else {
+                    // Время истекло, освобождаем
+                    releaseFromDemorgan(playerName);
+                }
+            }
+        }
     }
 
     /**
@@ -170,6 +304,50 @@ public class DemorganManager {
 
         return String.format("§7Игрок: §f%s\n§7Причина: §f%s\n§7Администратор: §a%s\n§7Оставшееся время: §e%s",
                 playerName, data.getReason(), data.getAdministrator(), data.getFormattedRemainingTime());
+    }
+
+    /**
+     * ПРИНУДИТЕЛЬНАЯ проверка местоположения всех игроков в демогрант
+     */
+    private static void checkPlayerLocations() {
+        for (String playerName : demorganPlayers.keySet()) {
+            Player player = Bukkit.getPlayer(playerName);
+            if (player == null || !player.isOnline()) {
+                continue;
+            }
+
+            // Проверяем права на обход
+            if (player.hasPermission("refontsearch.demorgan.bypass")) {
+                continue;
+            }
+
+            Location demorganLocation = getDemorganLocation();
+            if (demorganLocation == null) {
+                continue;
+            }
+
+            Location playerLocation = player.getLocation();
+            double radius = plugin.getConfig().getDouble("demorgan.radius", 30.0);
+            double distance = playerLocation.distance(demorganLocation);
+
+            // Проверяем мир и расстояние
+            if (!playerLocation.getWorld().equals(demorganLocation.getWorld()) || distance > radius) {
+                // Принудительно возвращаем в демогрант
+                player.teleport(demorganLocation);
+
+                // Отправляем сообщение
+                String message = ChatColor.translateAlternateColorCodes('&',
+                        plugin.getConfig().getString("messages.demorgan.leave", "§c§l⚔ §7Вы не можете покинуть демогрант!"));
+                player.sendMessage(message);
+
+                // Показываем эффекты побега
+                showEscapeEffects(player);
+
+                // Логируем попытку побега
+                plugin.getLogger().info("Принудительно возвращен в демогрант: " + playerName +
+                        " (расстояние: " + String.format("%.1f", distance) + " блоков, лимит: " + radius + ")");
+            }
+        }
     }
 
     /**
@@ -383,6 +561,7 @@ public class DemorganManager {
         Map<String, Object> stats = new HashMap<>();
         stats.put("total_players", demorganPlayers.size());
         stats.put("active_tasks", releaseTasks.size());
+        stats.put("active_timers", timerTasks.size()); // Новая статистика
 
         // Подсчет по типам нарушений
         Map<String, Integer> reasonStats = new HashMap<>();
@@ -398,7 +577,7 @@ public class DemorganManager {
      * Очистка при отключении плагина
      */
     public static void onDisable() {
-        // Отменяем все задачи
+        // Отменяем все задачи освобождения
         for (BukkitTask task : releaseTasks.values()) {
             if (task != null) {
                 task.cancel();
@@ -406,10 +585,19 @@ public class DemorganManager {
         }
         releaseTasks.clear();
 
+        // ========== НОВЫЙ ФУНКЦИОНАЛ: ОТМЕНА ВСЕХ ТАЙМЕРОВ ==========
+        for (BukkitTask timerTask : timerTasks.values()) {
+            if (timerTask != null) {
+                timerTask.cancel();
+            }
+        }
+        timerTasks.clear();
+        // ============================================================
+
         // Сохраняем данные
         saveDemorganData();
 
-        plugin.getLogger().info("DemorganManager отключен. Отменено " + releaseTasks.size() + " задач автоосвобождения");
+        plugin.getLogger().info("DemorganManager отключен. Отменено задач автоосвобождения: " + releaseTasks.size() + ", таймеров: " + timerTasks.size());
     }
 
     /**

@@ -1,4 +1,4 @@
-# config.yml
+# config.yml - RefontSearch v1.0.6
 
 # jailTimers: значения указываются в секундах (например, 900 = 15 минут)
 jailTimers:
@@ -36,7 +36,7 @@ display:
 
 # Настройки розыска
 wanted:
-  maxStars: 5  # Максимальное количество звезд розыска
+  maxStars: 7  # Максимальное количество звезд розыска (изменено с 5 на 7)
   allowCustomStars: true  # Разрешить менять количество звезд
   requireArticle: true    # Требовать указание статьи УК при выдаче розыска
 
@@ -50,6 +50,8 @@ articles:
     - "6.1 УК"
     - "7.1 УК"
     - "8.1 УК"
+    - "9.1 УК"
+    - "10.1 УК"
     - "Административное нарушение"
 
 # ==================================================================================
@@ -85,7 +87,7 @@ demorgan:
   max_time: 1440 # 24 часа
 
   # Радиус демогрант зоны (если игрок пытается выйти)
-  radius: 25.0
+  radius: 30.0
 
   # Автоматическое освобождение
   auto_release: true
@@ -131,6 +133,16 @@ demorgan:
       sound: "entity.player.levelup"
       soundVolume: 1.0
       soundPitch: 1.0
+
+    # ========== НОВЫЙ БЛОК: НАСТРОЙКИ ТАЙМЕРА ==========
+    # Таймер демогрант (отображается в центре экрана)
+    timer:
+      title: "§c§lДЕМОГРАН"
+      subtitle: "§7Осталось: §e{time}"
+      fadeIn: 0
+      stay: 25
+      fadeOut: 10
+    # ==================================================
 
 # ==================================================================================
 # ПЛЕЙСХОЛДЕРЫ ДЛЯ СТОРОННИХ ПЛАГИНОВ (PlaceholderAPI)
@@ -319,7 +331,7 @@ placeholderapi:
 # Команды и права доступа
 commands:
   wanted:
-    usage: "/wanted <ник> <звезды> <статья> <причина>"
+    usage: "/wanted [<ник> <звезды> <статья> <причина>]"
     permission: "refontsearch.wanted"
   arrest:
     usage: "/arrest <ник> [время] [статья] [тюрьма]"
@@ -342,3 +354,9 @@ commands:
   setdemorgan:
     usage: "/setdemorgan [spawn|release]"
     permission: "refontsearch.setdemorgan"
+
+# Отладка
+debug:
+  log_demorgan_changes: false
+  log_wanted_changes: false
+  log_jail_changes: false

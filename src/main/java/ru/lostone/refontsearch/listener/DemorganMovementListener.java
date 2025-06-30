@@ -1,5 +1,6 @@
 package ru.lostone.refontsearch.listener;
 
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -26,13 +27,21 @@ public class DemorganMovementListener implements Listener {
     public void onPlayerMove(PlayerMoveEvent event) {
         Player player = event.getPlayer();
 
-        // Проверяем, находится ли игрок в демогрант
         if (!DemorganManager.isInDemorgan(player.getName())) {
             return;
         }
 
-        // Проверяем права на обход демогрант
         if (player.hasPermission("refontsearch.demorgan.bypass")) {
+            return;
+        }
+
+        Location from = event.getFrom();
+        Location to = event.getTo();
+        if (to == null) {
+            return;
+        }
+
+        if (from.distance(to) < 0.1) {
             return;
         }
 
@@ -41,19 +50,17 @@ public class DemorganMovementListener implements Listener {
             return;
         }
 
-        Location playerLocation = player.getLocation();
+        double radius = plugin.getConfig().getDouble("demorgan.radius", 30.0);
+        double distance = to.distance(demorganLocation);
 
-        // Проверяем, находится ли игрок в том же мире
-        if (!playerLocation.getWorld().equals(demorganLocation.getWorld())) {
+        if (!to.getWorld().equals(demorganLocation.getWorld())) {
+            event.setCancelled(true);
             returnToDemorgan(player, demorganLocation);
             return;
         }
 
-        // Проверяем расстояние от центра демогрант
-        double radius = plugin.getConfig().getDouble("demorgan.radius", 25.0);
-        double distance = playerLocation.distance(demorganLocation);
-
         if (distance > radius) {
+            event.setCancelled(true);
             returnToDemorgan(player, demorganLocation);
         }
     }
@@ -62,12 +69,10 @@ public class DemorganMovementListener implements Listener {
     public void onPlayerTeleport(PlayerTeleportEvent event) {
         Player player = event.getPlayer();
 
-        // Проверяем, находится ли игрок в демогрант
         if (!DemorganManager.isInDemorgan(player.getName())) {
             return;
         }
 
-        // Проверяем права на обход демогрант
         if (player.hasPermission("refontsearch.demorgan.bypass")) {
             return;
         }
@@ -82,21 +87,15 @@ public class DemorganMovementListener implements Listener {
             return;
         }
 
-        // Проверяем, пытается ли игрок телепортироваться за пределы демогрант
-        if (!targetLocation.getWorld().equals(demorganLocation.getWorld())) {
-            event.setCancelled(true);
-            player.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                    plugin.getConfig().getString("messages.demorgan.leave", "§c§l⚔ §7Вы не можете покинуть демогрант!")));
-            return;
-        }
-
-        double radius = plugin.getConfig().getDouble("demorgan.radius", 25.0);
+        double radius = plugin.getConfig().getDouble("demorgan.radius", 30.0);
         double distance = targetLocation.distance(demorganLocation);
 
-        if (distance > radius) {
+        if (!targetLocation.getWorld().equals(demorganLocation.getWorld()) || distance > radius) {
             event.setCancelled(true);
             player.sendMessage(ChatColor.translateAlternateColorCodes('&',
                     plugin.getConfig().getString("messages.demorgan.leave", "§c§l⚔ §7Вы не можете покинуть демогрант!")));
+
+            showEscapeEffects(player);
         }
     }
 
@@ -104,18 +103,15 @@ public class DemorganMovementListener implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
 
-        // Проверяем, находится ли игрок в демогрант
         if (!DemorganManager.isInDemorgan(player.getName())) {
             return;
         }
 
-        // Получаем данные демогрант
         DemorganData data = DemorganManager.getDemorganData(player.getName());
         if (data == null) {
             return;
         }
 
-        // Проверяем, не истекло ли время
         if (data.isExpired()) {
             DemorganManager.releaseFromDemorgan(player.getName());
             player.sendMessage(ChatColor.translateAlternateColorCodes('&',
@@ -123,13 +119,13 @@ public class DemorganMovementListener implements Listener {
             return;
         }
 
-        // Телепортируем в демогрант
-        Location demorganLocation = getDemorganSpawnLocation();
-        if (demorganLocation != null) {
-            player.teleport(demorganLocation);
-        }
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            Location demorganLocation = getDemorganSpawnLocation();
+            if (demorganLocation != null) {
+                player.teleport(demorganLocation);
+            }
+        }, 20L);
 
-        // Уведомляем о возвращении в демогрант
         String message = ChatColor.translateAlternateColorCodes('&',
                 plugin.getConfig().getString("messages.demorgan.rejoin", "§c§l⚔ §7Вы все еще находитесь в демогрант!"))
                 + "\n§7Причина: §f" + data.getReason()
@@ -138,28 +134,22 @@ public class DemorganMovementListener implements Listener {
 
         player.sendMessage(message);
 
-        // Эффекты при возвращении
-        showDemorganEffects(player);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            DemorganManager.showDemorganEffects(player);
+        }, 40L);
     }
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
 
-        // Если игрок в демогрант, логируем выход
         if (DemorganManager.isInDemorgan(player.getName())) {
             DemorganData data = DemorganManager.getDemorganData(player.getName());
             if (data != null) {
-                plugin.getLogger().info("Игрок " + player.getName() + " вышел из игры, находясь в демогрант. " +
-                        "Оставшееся время: " + data.getFormattedRemainingTime() +
-                        ". Причина: " + data.getReason());
             }
         }
     }
 
-    /**
-     * Возвращает игрока в демогрант
-     */
     private void returnToDemorgan(Player player, Location demorganLocation) {
         player.teleport(demorganLocation);
 
@@ -167,21 +157,14 @@ public class DemorganMovementListener implements Listener {
                 plugin.getConfig().getString("messages.demorgan.leave", "§c§l⚔ §7Вы не можете покинуть демогрант!"));
         player.sendMessage(message);
 
-        // Показываем эффекты побега
         showEscapeEffects(player);
 
-        // Логируем попытку побега
         DemorganData data = DemorganManager.getDemorganData(player.getName());
         if (data != null) {
-            plugin.getLogger().info("Игрок " + player.getName() + " пытался сбежать из демогрант. " +
-                    "Администратор: " + data.getAdministrator() +
-                    ". Причина: " + data.getReason());
+            double distance = player.getLocation().distance(demorganLocation);
         }
     }
 
-    /**
-     * Получает локацию спавна демогрант
-     */
     private Location getDemorganSpawnLocation() {
         String locStr = plugin.getConfig().getString("demorgan.location.spawn", "");
         if (locStr.isEmpty()) {
@@ -190,9 +173,6 @@ public class DemorganMovementListener implements Listener {
         return parseLocation(locStr);
     }
 
-    /**
-     * Парсит строку локации
-     */
     private Location parseLocation(String locStr) {
         try {
             String[] parts = locStr.split(";");
@@ -209,40 +189,7 @@ public class DemorganMovementListener implements Listener {
         }
     }
 
-    /**
-     * Показывает эффекты при входе в демогрант
-     */
-    private void showDemorganEffects(Player player) {
-        // Title и Subtitle
-        String title = ChatColor.translateAlternateColorCodes('&',
-                plugin.getConfig().getString("demorgan.effects.rejoin.title", "§c§lДЕМОГРАН"));
-        String subtitle = ChatColor.translateAlternateColorCodes('&',
-                plugin.getConfig().getString("demorgan.effects.rejoin.subtitle", "§7Вы находитесь в административной тюрьме"));
-
-        int fadeIn = plugin.getConfig().getInt("demorgan.effects.rejoin.fadeIn", 10);
-        int stay = plugin.getConfig().getInt("demorgan.effects.rejoin.stay", 60);
-        int fadeOut = plugin.getConfig().getInt("demorgan.effects.rejoin.fadeOut", 20);
-
-        player.sendTitle(title, subtitle, fadeIn, stay, fadeOut);
-
-        // Звук
-        String sound = plugin.getConfig().getString("demorgan.effects.rejoin.sound", "block.iron_door.close");
-        float volume = (float) plugin.getConfig().getDouble("demorgan.effects.rejoin.soundVolume", 1.0);
-        float pitch = (float) plugin.getConfig().getDouble("demorgan.effects.rejoin.soundPitch", 1.0);
-
-        try {
-            player.playSound(player.getLocation(), sound, volume, pitch);
-        } catch (Exception e) {
-            // Если звук не найден, используем стандартный
-            player.playSound(player.getLocation(), "block.iron_door.close", 1.0f, 1.0f);
-        }
-    }
-
-    /**
-     * Показывает эффекты при попытке побега
-     */
     private void showEscapeEffects(Player player) {
-        // Title и Subtitle
         String title = ChatColor.translateAlternateColorCodes('&',
                 plugin.getConfig().getString("demorgan.effects.escape.title", "§c§lПОБЕГ НЕВОЗМОЖЕН!"));
         String subtitle = ChatColor.translateAlternateColorCodes('&',
@@ -254,7 +201,6 @@ public class DemorganMovementListener implements Listener {
 
         player.sendTitle(title, subtitle, fadeIn, stay, fadeOut);
 
-        // Звук
         String sound = plugin.getConfig().getString("demorgan.effects.escape.sound", "entity.enderman.teleport");
         float volume = (float) plugin.getConfig().getDouble("demorgan.effects.escape.soundVolume", 1.0);
         float pitch = (float) plugin.getConfig().getDouble("demorgan.effects.escape.soundPitch", 0.5);
@@ -262,7 +208,6 @@ public class DemorganMovementListener implements Listener {
         try {
             player.playSound(player.getLocation(), sound, volume, pitch);
         } catch (Exception e) {
-            // Если звук не найден, используем стандартный
             player.playSound(player.getLocation(), "entity.enderman.teleport", 1.0f, 0.5f);
         }
     }

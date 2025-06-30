@@ -52,6 +52,15 @@ public class DemorganData {
     public String getType() { return type; }
     public void setType(String type) { this.type = type; }
 
+    // ========== ДОБАВЛЕННЫЙ МЕТОД ДЛЯ ИСПРАВЛЕНИЯ ОШИБКИ ==========
+    /**
+     * Получает время освобождения в миллисекундах
+     */
+    public long getReleaseTime() {
+        return timestamp + (duration * 1000L);
+    }
+    // ==============================================================
+
     // Проверка, истекло ли время заключения
     public boolean isExpired() {
         return System.currentTimeMillis() > (timestamp + duration * 1000);
@@ -62,6 +71,15 @@ public class DemorganData {
         long remaining = (timestamp + duration * 1000 - System.currentTimeMillis()) / 1000;
         return Math.max(0, remaining);
     }
+
+    // ========== ДОПОЛНИТЕЛЬНЫЙ МЕТОД ДЛЯ СОВМЕСТИМОСТИ ==========
+    /**
+     * Алиас для getRemainingTime() для совместимости с DemorganManager
+     */
+    public long getRemainingTimeSeconds() {
+        return getRemainingTime();
+    }
+    // ============================================================
 
     // Форматированное оставшееся время
     public String getFormattedRemainingTime() {
