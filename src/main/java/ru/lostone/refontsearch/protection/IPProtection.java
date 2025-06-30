@@ -24,6 +24,13 @@ public class IPProtection {
     private long lastFallbackCheck = 0;
     private static final long FALLBACK_RECHECK_TIME = 1800000; // 30 минут
 
+    // ========== НОВОЕ: СИСТЕМА АНТИ-СПАМА ==========
+    private boolean lastCheckSuccess = false;
+    private long lastSuccessLogTime = 0;
+    private static final long SUCCESS_LOG_INTERVAL = 3600000; // 1 час между успешными логами
+    private String lastServerName = "";
+    // ===============================================
+
     public IPProtection(JavaPlugin plugin) {
         this.plugin = plugin;
     }
@@ -35,7 +42,8 @@ public class IPProtection {
         try {
             // Проверяем локальные IP (для разработки)
             if (isLocalDevelopment()) {
-                plugin.getLogger().info("🏠 Локальный режим разработки");
+                // Логируем только раз в час
+                logOnce("🏠 Локальный режим разработки", true);
                 return true;
             }
 
@@ -43,7 +51,7 @@ public class IPProtection {
             if (fallbackModeActive) {
                 long currentTime = System.currentTimeMillis();
                 if ((currentTime - lastFallbackCheck) < FALLBACK_RECHECK_TIME) {
-                    plugin.getLogger().info("🆘 FALLBACK режим активен - плагин работает без проверок");
+                    // НЕ ЛОГИРУЕМ каждый раз - только при активации
                     return true;
                 } else {
                     // Пробуем восстановить соединение
@@ -80,15 +88,36 @@ public class IPProtection {
                         deactivateFallbackMode();
                     }
                 }
+                lastCheckSuccess = true;
                 return true;
             } else {
+                lastCheckSuccess = false;
                 // Это отказ в авторизации, а не проблема с сайтом
                 return false;
             }
 
         } catch (Exception e) {
             plugin.getLogger().warning("❌ Ошибка проверки IP: " + e.getMessage());
+            lastCheckSuccess = false;
             return handleConnectionFailure();
+        }
+    }
+
+    /**
+     * ========== НОВЫЙ МЕТОД: ЛОГИРОВАНИЕ БЕЗ СПАМА ==========
+     */
+    private void logOnce(String message, boolean isSuccess) {
+        long currentTime = System.currentTimeMillis();
+
+        if (isSuccess) {
+            // Логируем успех только раз в час
+            if ((currentTime - lastSuccessLogTime) >= SUCCESS_LOG_INTERVAL) {
+                plugin.getLogger().info(message);
+                lastSuccessLogTime = currentTime;
+            }
+        } else {
+            // Ошибки логируем всегда
+            plugin.getLogger().warning(message);
         }
     }
 
@@ -205,7 +234,7 @@ public class IPProtection {
     }
 
     /**
-     * ПРОВЕРКА IP В БАЗЕ ДАННЫХ с обработкой fallback
+     * ПРОВЕРКА IP В БАЗЕ ДАННЫХ с обработкой fallback (БЕЗ СПАМА)
      */
     private boolean checkIPInDatabase(String ip) {
         try {
@@ -241,11 +270,23 @@ public class IPProtection {
                         if (jsonResponse.has("data")) {
                             JsonObject data = jsonResponse.getAsJsonObject("data");
 
-                            // Краткий лог успеха
+                            // ========== ИСПРАВЛЕНИЕ: УБИРАЕМ СПАМ ==========
                             if (data.has("server_name")) {
                                 String serverName = data.get("server_name").getAsString();
-                                plugin.getLogger().info("✅ IP подтвержден: " + serverName);
+
+                                // Логируем только:
+                                // 1. При первом успехе
+                                // 2. При смене статуса с ошибки на успех
+                                // 3. Раз в час
+                                if (!lastCheckSuccess || !serverName.equals(lastServerName)) {
+                                    plugin.getLogger().info("✅ IP подтвержден: " + serverName);
+                                    lastServerName = serverName;
+                                } else {
+                                    // ТИХАЯ проверка - НЕ ЛОГИРУЕМ
+                                    logOnce("✅ IP подтвержден: " + serverName, true);
+                                }
                             }
+                            // ===============================================
 
                             return true;
                         }
@@ -314,7 +355,7 @@ public class IPProtection {
     }
 
     /**
-     * Проверка целостности плагина
+     * Проверка целостности плагина (БЕЗ СПАМА)
      */
     public boolean checkIntegrity() {
         try {
@@ -333,8 +374,10 @@ public class IPProtection {
                 return false;
             }
 
-            // Логируем успешную проверку
-            plugin.getLogger().info("✅ Проверка целостности пройдена: " + pluginName + " v" + pluginVersion);
+            // ========== УБИРАЕМ СПАМ: НЕ ЛОГИРУЕМ КАЖДЫЙ РАЗ ==========
+            // Логируем только при первом запуске или ошибках
+            // plugin.getLogger().info("✅ Проверка целостности пройдена: " + pluginName + " v" + pluginVersion);
+            // ==========================================================
 
             return true;
 
@@ -360,6 +403,7 @@ public class IPProtection {
     public void forceReconnectionCheck() {
         plugin.getLogger().info("🔄 Принудительная проверка восстановления соединения...");
         lastFallbackCheck = 0; // Сбрасываем таймер
+        lastCheckSuccess = false; // Сбрасываем статус для принудительного лога
         validateServer(); // Проверяем заново
     }
 
@@ -370,6 +414,21 @@ public class IPProtection {
         fallbackModeActive = false;
         consecutiveFailures = 0;
         lastFallbackCheck = 0;
+        lastCheckSuccess = false;
+        lastSuccessLogTime = 0;
         plugin.getLogger().info("🔄 Fallback режим принудительно сброшен");
+    }
+
+    /**
+     * ========== НОВЫЙ МЕТОД: ПОЛУЧЕНИЕ СТАТУСА ==========
+     */
+    public String getProtectionStatus() {
+        if (fallbackModeActive) {
+            return "§e⚠ FALLBACK режим";
+        } else if (lastCheckSuccess) {
+            return "§a✅ Авторизован";
+        } else {
+            return "§c❌ Не авторизован";
+        }
     }
 }

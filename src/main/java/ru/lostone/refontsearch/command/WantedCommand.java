@@ -31,7 +31,7 @@ public class WantedCommand implements CommandExecutor, TabCompleter {
         }
 
         Player player = (Player) sender;
-        if (!player.hasPermission("refontsearch.wanted")) {
+        if (!player.hasPermission("refontsearch.wanted") && !player.isOp()) {
             player.sendMessage("§cУ вас нет прав для использования этой команды.");
             return true;
         }

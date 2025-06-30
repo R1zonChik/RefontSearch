@@ -31,8 +31,6 @@ public class DemorganManager {
 
         // ПРИНУДИТЕЛЬНАЯ проверка местоположения каждые 5 секунд
         Bukkit.getScheduler().runTaskTimer(plugin, DemorganManager::checkPlayerLocations, 100L, 100L);
-
-        plugin.getLogger().info("DemorganManager инициализирован с принудительной проверкой местоположения и таймерами");
     }
 
     /**
@@ -342,10 +340,6 @@ public class DemorganManager {
 
                 // Показываем эффекты побега
                 showEscapeEffects(player);
-
-                // Логируем попытку побега
-                plugin.getLogger().info("Принудительно возвращен в демогрант: " + playerName +
-                        " (расстояние: " + String.format("%.1f", distance) + " блоков, лимит: " + radius + ")");
             }
         }
     }
@@ -400,7 +394,6 @@ public class DemorganManager {
         }
 
         if (!toRelease.isEmpty()) {
-            plugin.getLogger().info("Автоматически освобождено из демогрант: " + toRelease.size() + " игроков");
         }
     }
 

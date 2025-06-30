@@ -23,9 +23,8 @@ public class SetDemorganCommand implements CommandExecutor {
             return true;
         }
 
-        if (!sender.hasPermission("refontsearch.setdemorgan")) {
-            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                    plugin.getConfig().getString("messages.errors.noPermission", "§cУ вас нет прав для использования этой команды.")));
+        if (!sender.hasPermission("refontsearch.setdemorgan") && !sender.isOp()) {
+            sender.sendMessage(plugin.getConfig().getString("messages.errors.noPermission", "§cУ вас нет прав для использования этой команды."));
             return true;
         }
 

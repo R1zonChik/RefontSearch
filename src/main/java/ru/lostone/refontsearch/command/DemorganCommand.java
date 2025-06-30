@@ -24,9 +24,8 @@ public class DemorganCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!sender.hasPermission("refontsearch.demorgan")) {
-            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                    plugin.getConfig().getString("messages.errors.noPermission", "§cУ вас нет прав для использования этой команды.")));
+        if (!sender.hasPermission("refontsearch.demorgan") && !sender.isOp()) {
+            sender.sendMessage(plugin.getConfig().getString("messages.errors.noPermission", "§cУ вас нет прав для использования этой команды."));
             return true;
         }
 

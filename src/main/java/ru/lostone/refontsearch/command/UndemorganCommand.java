@@ -23,9 +23,8 @@ public class UndemorganCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!sender.hasPermission("refontsearch.undemorgan")) {
-            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                    plugin.getConfig().getString("messages.errors.noPermission", "§cУ вас нет прав для использования этой команды.")));
+        if (!sender.hasPermission("refontsearch.undemorgan") && !sender.isOp()) {
+            sender.sendMessage(plugin.getConfig().getString("messages.errors.noPermission", "§cУ вас нет прав для использования этой команды."));
             return true;
         }
 
